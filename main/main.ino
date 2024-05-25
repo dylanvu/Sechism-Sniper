@@ -1,9 +1,16 @@
+// Yellow: ESP32C3 Dev Module
+// Black: ESP32S3 Dev Module
+
+// this code is for ESP32C3 Dev Module
 #include <ESP32Servo.h>
 #include <Arduino_JSON.h>
 
 const int HORIZONTAL_SERVO = 40;
 const int VERTICAL_SERVO = 39;    // for now
 const int LASER_PIN = 38;         // for now
+
+const int FLYWHEEL_GPIO = 36;
+const int TRIGGER_GPIO = 37;
 
 Servo horizontalServo; 
 Servo verticalServo;
@@ -15,6 +22,10 @@ void setup() {
   Serial.begin(115200);
   horizontalServo.attach(HORIZONTAL_SERVO);
   verticalServo.attach(VERTICAL_SERVO);
+
+  // set pinmodes
+  pinMode(FLYWHEEL_GPIO, OUTPUT);
+  pinMode(TRIGGER_GPIO, OUTPUT);
 }
 
 void loop() {
@@ -55,6 +66,20 @@ void loop() {
       bufferIndex = 0;  // Reset buffer
     }
   }
+
+  // firing test
+  // allow flywheel to ramp up for 3 seconds
+  digitalWrite(FLYWHEEL_GPIO, HIGH);
+  delay(3000);
+
+  // pulse the trigger
+  digitalWrite(TRIGGER_GPIO, HIGH); // retract
+  delay(1000);
+  digitalWrite(TRIGGER_GPIO, LOW); // extend
+
+  // allow flywheel to ramp down for 3 seconds
+  digitalWrite(FLYWHEEL_GPIO, LOW);
+  delay(3000);
 }
 
 void followCoordinates(const int x, const int y, const int camHeight, const int camWidth, const int horizontalFOV, const int verticalFOV) {
