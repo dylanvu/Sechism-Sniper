@@ -23,8 +23,7 @@ def detect_faces(frame):
 
 def recognize_faces(frame):
     gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = face_classifier.detectMultiScale(gray_image, 1.1, 5, minSize=(40, 40))
-    print(type(faces))
+    faces = face_classifier.detectMultiScale(gray_image, 1.3, 7, minSize=(40, 40))
 
     # run this code if directory is not empty
     for (x, y, w, h) in faces:
@@ -40,8 +39,8 @@ def recognize_faces(frame):
             # Recognize the face using DeepFace
             result = DeepFace.find(face, db_path=facesPath, enforce_detection=False)
             
-            # if we find existing person
-            if len(result[0]['identity']) != 0:
+            # if we find existing person in existing directory
+            if len(result[0]['identity']) != 0: # and result[0].iloc[0]['distance'] < 0.5
                 # pulls id from known person (pandas.dataframe --> pandas.Series --> string)
                 print("Face Exists")
                 identity = result[0]['identity'][0]
@@ -67,16 +66,18 @@ def recognize_faces(frame):
             cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 4)
             cv2.putText(frame, "Error", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
 
-        # find user with highest red flag count
-        print(f"All people: {people}")
-        redFlag = max(people, key=lambda p: people[p]['redFlag'])
-        redFlag = people[redFlag]
-        print(f"Red Flag: {redFlag}")
+        if people:
+            # find user with highest red flag count
+            print(f"All people: {people}")
+            redFlag = max(people, key=lambda p: people[p]['redFlag'])
+            redFlag = people[redFlag]
+            print(f"Red Flag: {redFlag}")
 
-        # sets text and box frame around person
-        cv2.rectangle(frame, (redFlag['x'], redFlag['y']), (redFlag['x'] + redFlag['w'], redFlag['y'] + redFlag['h']), (0, 0, 255), 4)
-        cv2.putText(frame, "Red Flag", (redFlag['x'], redFlag['y'] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+            # sets text and box frame around person
+            cv2.rectangle(frame, (redFlag['x'], redFlag['y']), (redFlag['x'] + redFlag['w'], redFlag['y'] + redFlag['h']), (0, 0, 255), 4)
+            cv2.putText(frame, "Red Flag", (redFlag['x'], redFlag['y'] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
 
+    people.clear()
     return faces
 
 def save_new_face(face):
