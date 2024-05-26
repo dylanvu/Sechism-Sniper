@@ -24,17 +24,6 @@ textQueue = queue.Queue()
 # global event to signal thread termination
 stop_event = threading.Event()
 
-# test function (delete later)
-def detect_faces(frame):
-    gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = face_classifier.detectMultiScale(gray_image, 1.1, 5, minSize=(40, 40))
-    
-    # create box around the face
-    for (x, y, w, h) in faces:
-        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 4)
-    
-    return faces
-
 # identifies faces in webcam view
 def recognize_faces(frame):
     gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -59,24 +48,18 @@ def recognize_faces(frame):
                 # pulls id from known person (pandas.dataframe --> pandas.Series --> string)
                 print("Face Exists")
                 identity = result[0]['identity'][0]
+                # updates latest position of face
                 with lock:
                     people[identity] = {"redFlag" : random.randint(0,10), "x" : x, "y" : y, "w" : w, "h" : h}
 
-                # sets text and box frame around person
-                # cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 4)
-                # cv2.putText(frame, identity.split("/")[-1], (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-            
             # if we don't find existing person
             else:
-                # saving new face
                 print("Adding New Face")
+                # saving new face into database
                 identity = save_new_face(face)
+                # saving face coordinates in local dictionary
                 with lock:
                     people[identity] = people[identity] = {"redFlag" : 0, "x" : x, "y" : y, "w" : w, "h" : h}
-
-                # sets text and box frame around person
-                # cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 4)
-                # cv2.putText(frame, identity.split("/")[-1], (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
 
         except Exception as e:
             print(f"Error recognizing face: {e}")
@@ -121,7 +104,6 @@ def web_cam():
 
         # apply the function we created to the video frame
         faces = recognize_faces(videoFrame) 
-        # faces = detect_faces(videoFrame)
 
         # display the processed frame in a window named "My Face Detection Project"
         cv2.imshow("Amelio", videoFrame)  
@@ -133,13 +115,6 @@ def web_cam():
     print(f"Total People: {count}")
     video_capture.release()
     cv2.destroyAllWindows()
-
-# convert text to speech
-def speak_text(command):
-    # Initialize the engine
-    engine = pyttsx3.init()
-    engine.say(command) 
-    engine.runAndWait()
 
 def speech_to_text():
     print("Listening")
@@ -169,14 +144,12 @@ def speech_to_text():
                     print("Not Important")
 
                 # if speech recognized, associate it with the latest recognized face
-                # if people:
-                #     center_x, center_y = video_capture.get(cv2.CAP_PROP_FRAME_WIDTH) / 2, video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT) / 2
-                #     latest_person = max(people, key=lambda p: ((p['x'] + p['w'] / 2) - center_x) ** 2 + ((p['y'] + p['h'] / 2) - center_y) ** 2)
-                #     with lock:
-                #         text_results[latest_person] = MyText
-                #     print(f"Speech associated with person: {latest_person}")
-
-                # speak_text(MyText)
+                if people:
+                    center_x, center_y = video_capture.get(cv2.CAP_PROP_FRAME_WIDTH) / 2, video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT) / 2
+                    latest_person = max(people, key=lambda p: ((p['x'] + p['w'] / 2) - center_x) ** 2 + ((p['y'] + p['h'] / 2) - center_y) ** 2)
+                    with lock:
+                        text_results[latest_person] = MyText
+                    print(f"Speech associated with person: {latest_person}")
 
         except sr.WaitTimeoutError:
             print("Listening timed out, please speak again.")
@@ -188,7 +161,7 @@ def speech_to_text():
 if __name__ == "__main__":
     # initialize face classifier and webcam
     face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-    video_capture = cv2.VideoCapture(0)
+    video_capture = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
     # Initialize gemini to detect red flags
     redFlagDetection = gemini.GeminiAPI()
@@ -197,7 +170,7 @@ if __name__ == "__main__":
     r = sr.Recognizer() 
 
     # Create threads for facial recognition and speech recognition
-    face_thread = threading.Thread(target=web_cam)   # this won't work but this will # web_cam()
+    face_thread = threading.Thread(target=web_cam) # if running without web_cam()
     speech_thread = threading.Thread(target=speech_to_text)
 
     # Start the threads
