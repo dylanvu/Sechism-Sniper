@@ -10,6 +10,8 @@ import requests
 import queue
 import time
 import requests
+from PIL import Image
+from io import BytesIO
 
 BACKEND_URL = 'http://localhost:3000'
 import gemini
@@ -17,7 +19,7 @@ import queue
 # do not forget pyaudio installation
 
 # Path to the face database
-facesPath = "facial_recognition/faces"
+facesPath = "faces"
 os.makedirs(facesPath, exist_ok=True)
 
 # list of people
@@ -172,6 +174,31 @@ def speech_to_text():
             print("Unknown error occurred")
 
 if __name__ == "__main__":
+    # get everything from the database and put it into a local path
+    try:
+        response = requests.get(BACKEND_URL + '/getAllData')
+        data = response.json()
+    
+        # populating people dictionary and creating images in specified folder
+        for obj in data:
+            value = {'score': obj['score'], 'x': 0 , 'y': 0, 'w': 0, 'h': 0}
+            file_dic = {obj['user_id'] : value}
+            people.update(file_dic)
+            
+            img_url = obj['url']
+            img_data = requests.get(img_url).content
+            
+            img = Image.open(BytesIO(img_data))
+            
+            save_path = os.path.join(facesPath, obj['user_id'] + '.png')
+            
+            img.save(save_path, format='PNG')
+            print("Images saved")
+        
+
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred: {e}")
+      
     # initialize face classifier and webcam
     face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
     video_capture = cv2.VideoCapture(0, cv2.CAP_DSHOW)

@@ -9,6 +9,7 @@ service_account.json
 
 node_modules
 */facial_recognition/faces
+/faces
 
 .venv
 

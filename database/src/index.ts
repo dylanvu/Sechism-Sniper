@@ -4,7 +4,7 @@ import multer from 'multer';
 
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { getStorage } from 'firebase-admin/storage';
+import { getStorage, getDownloadURL } from 'firebase-admin/storage';
 
 import serviceAccount from "../service_account.json";
 import { error } from "console";
@@ -112,6 +112,7 @@ app.post("/sendData", upload.single('image_file'), async (req: Request, res:Resp
   blobStream.on('finish', async () => {
     const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
     
+
     // Save file metadata to Firestore
     await db.collection('image_files').add({
       unique_id: user_id,
@@ -122,15 +123,21 @@ app.post("/sendData", upload.single('image_file'), async (req: Request, res:Resp
       createdAt: new Date(),
     });
 
+    // get the download URL of the new file
+    const fileRef = getStorage().bucket(bucket.name).file(blob.name)
+    const downloadURL = await getDownloadURL(fileRef)
+
+    console.log(downloadURL)
+
     try {
-      await addtoFirestore(user_id, score, publicUrl)
+      await addtoFirestore(user_id, score, downloadURL)
     }
     catch(error) {
       console.log(error)
       res.send("Unable to add user_id and score to database")
     }
     
-    res.status(200).send({user_id, score, fileName: imageFile.originalname, fileUrl: publicUrl });
+    res.status(200).send({user_id, score, fileName: imageFile.originalname, undefinedrl: downloadURL });
   });
 
   blobStream.end(imageFile.buffer);
@@ -166,6 +173,7 @@ app.get("/getAllData", async (req: Request, res: Response) => {
   try {
     const data = await getAllDataFromFireStore()
     console.log(data)
+    console.log("bucket name: ", bucket.name)
     if (data) {
       console.log("all data sent")
       res.send(data)
