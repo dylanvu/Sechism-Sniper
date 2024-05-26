@@ -99,6 +99,13 @@ def recognize_faces(frame):
                 # see if face is public enemy
                 if identity == publicEnemy:
                     print("Public Enemy in View!!!")
+                    # check if the face is closest to the center of the webcam
+                    # define a threshold for rough middle of the screen
+                    threshold = 100
+                    if abs(centerX - x) < threshold and abs(centerY - y) < threshold:
+                        print("Public Enemy in the Center!!!")
+                        # send command to the serial interface
+                        sendCommand("0", ser)
                 else: 
                     print(f"No go: {identity} vs {publicEnemy}")
 

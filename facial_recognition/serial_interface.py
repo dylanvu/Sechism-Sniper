@@ -2,6 +2,9 @@ import time
 import serial
 
 def sendCommand(command, ser):
+    if ser is None:
+        print("Serial port not open")
+        return
     print(f"Sending {command}")
 
     # convert the string to bytes
