@@ -20,12 +20,16 @@ count = len(os.listdir(facesPath))
 people = {} # filename -> {redFlagCount, x-coord, y-coord, width, height}
 text_results = {}
 textQueue = queue.Queue()
+personQueue = queue.Queue()
 
 # global event to signal thread termination
 stop_event = threading.Event()
 
 # identifies faces in webcam view
 def recognize_faces(frame):
+    # TODO: Jayson needs to add a face that will be associated with the most recent audio
+    # TODO: add it to the personQueue
+
     gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     faces = face_classifier.detectMultiScale(gray_image, 1.3, 7, minSize=(40, 40))
 
@@ -138,18 +142,21 @@ def speech_to_text():
 
                 print(f"Converted Text: {MyText}")
 
-                if redFlagDetection.analyze_text(MyText):
-                    print("Red Flag")
-                else:
-                    print("Not Important")
+                # add to the queue
+                textQueue.put(MyText)
 
-                # if speech recognized, associate it with the latest recognized face
-                if people:
-                    center_x, center_y = video_capture.get(cv2.CAP_PROP_FRAME_WIDTH) / 2, video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT) / 2
-                    latest_person = max(people, key=lambda p: ((p['x'] + p['w'] / 2) - center_x) ** 2 + ((p['y'] + p['h'] / 2) - center_y) ** 2)
-                    with lock:
-                        text_results[latest_person] = MyText
-                    print(f"Speech associated with person: {latest_person}")
+                # if redFlagDetection.analyze_text(MyText):
+                #     print("Red Flag")
+                # else:
+                #     print("Not Important")
+
+                # # if speech recognized, associate it with the latest recognized face
+                # if people:
+                #     center_x, center_y = video_capture.get(cv2.CAP_PROP_FRAME_WIDTH) / 2, video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT) / 2
+                #     latest_person = max(people, key=lambda p: ((p['x'] + p['w'] / 2) - center_x) ** 2 + ((p['y'] + p['h'] / 2) - center_y) ** 2)
+                #     with lock:
+                #         text_results[latest_person] = MyText
+                #     print(f"Speech associated with person: {latest_person}")
 
         except sr.WaitTimeoutError:
             print("Listening timed out, please speak again.")
@@ -179,6 +186,29 @@ if __name__ == "__main__":
 
     try:
         while True:
+            # process text queue
+            if not textQueue.empty():
+                text = textQueue.get()
+                print(f"Text: {text}")
+
+                # someone has said something, associate it with the newest person in the person queue
+                if personQueue.empty():
+                    print("No person to associate text with.")
+                else:
+                    person = personQueue.get()
+                    with lock:
+                        text_results[person] = text
+                    print(f"Text associated with person: {person}")
+
+                    # TODO: Send text to Gemini API for red flag detection
+                    isBad = True # Placeholder for now
+
+                    # TODO: person said something bad increment a red flag, save to database, etc jayson will handle this
+
+                    # trigger the gun
+                    # TODO: dylan will handle this
+
+
             time.sleep(0.1)  # Keep the main thread alive
 
     except KeyboardInterrupt:
