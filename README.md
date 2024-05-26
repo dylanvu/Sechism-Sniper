@@ -27,9 +27,12 @@ HackAtUCI + WiCS = Venus Hacks 2024
 
 *Request:*
 - Header: application/json
-- `data {
+
+```json
+data {
 "user_id": 1234abc
-}`
+}
+```
 
 
 # Facial Recognition
