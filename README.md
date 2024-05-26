@@ -5,8 +5,9 @@ HackAtUCI + WiCS = Venus Hacks 2024
 
 ## Send Data to Database
 **/sendData**
+Adds a user to the data base.
 
-*Request:*
+*POST Request:*
 - Header: form-data
 - user_id: text
 - image_file: File
@@ -21,21 +22,89 @@ HackAtUCI + WiCS = Venus Hacks 2024
 "fileUrl": "https://storage.googleapis.com/venushacks2024-777a4.appspot.com/baldgate.png"
 }
 ```
+*Error Response:*
+- Sends error message no json
 
 ## Get Data from Database
 **/getData**
+Retrieves a user in the data base. 
 
-*Request:*
-- Header: application/json
+*GET Request:*
+- http://localhost:3000/getData?user_id=1234
+- API URL/getData?user_id={unique id for each user}
 
+*Response:*
 ```json
-data {
-"user_id": 1234abc
+[
+    {
+        "ab123": {
+            "score": "1",
+            "user_id": "ab123",
+            "url": "https://storage.googleapis.com/venushacks2024-777a4.appspot.com/baldgate.png"
+        }
+    }
+]
+```
+*Error Response:* 
+```json
+{
+    "error": "-1",
+    "note": "there is no document with this user_id"
 }
 ```
 
+## Update Data from Database
+**/updateData**
+Updates an existing user in the database. Returns a -1 in error, when this happens call the route to /sendData and then call this route /updateData again.
 
-# Facial Recognition
+*PUT Request:*
+```json
+{
+    "user_id": "ab123",
+    "score_to_add:" "1"
+}
+```
+
+*Response:*
+- String: "Score Updated"
+- Check in database if update worked
+
+*Error Response:*
+```json
+{
+    "error": "-1",
+    "note": "add user to data base first, then call this route again"
+}
+```
+
+## Get Top Score From Database
+**/topScore**
+Retrieves the user data for who has the top score so far.
+
+*GET Request:*
+- http://localhost:3000/topScore
+- API URL/topScore
+
+*Response:*
+```
+json
+{
+    "score": "1",
+    "user_id": "ab123",
+    "url": "https://storage.googleapis.com/venushacks2024-777a4.appspot.com/baldgate.png"
+}
+```
+
+*Error Response:*
+```
+json
+{
+    "error": "-1",
+    "note": "no users found"
+}
+```
+
+## Facial Recognition
 pip install opencv-python
 
 pip install deepface
