@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "es2022",
     "module": "node16",
-    "moduleResolution": "node",
+    "moduleResolution": "Node16",
     "outDir": "./dist",
     "esModuleInterop": true,
     "resolveJsonModule": true,
