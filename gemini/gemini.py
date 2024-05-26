@@ -58,14 +58,30 @@ Replace true/false with either true if the speech does contain microaggressions 
                 temperature=0, # 1.0 is max for gemini 1.0, 2.0 is max for gemini 1.5
                 stop_sequences=["}"]
             ),
-            system_instruction=""
+            system_instruction=self.prompt
         )
     
     # basic function to generate questions from a prompt and return text
     def generate(self, prompt: str):
         chat_session = self.model.start_chat()
         response = chat_session.send_message(f"Here is the speech snippet to analyze:\n\n{prompt}")
+        response_text = response.candidates[0].content.parts[0].text
         # add in a } to the end of the response to ensure the JSON is valid
-        response += "}"
+        response_text += "}"
 
-        return response
+        return response_text
+    
+    def analyze_text(self, text: str):
+        response = self.generate(text)
+        response_json = json.loads(response)
+        return response_json["isBad"]
+
+if __name__ == "__main__":
+    gemini = GeminiAPI()
+    prompt = "I don't like women"
+    isBad = gemini.analyze_text(prompt)
+    print(prompt, isBad)
+
+    prompt = "I love apples"
+    isBad = gemini.analyze_text(prompt)
+    print(prompt, isBad)
