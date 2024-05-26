@@ -159,7 +159,7 @@ def speech_to_text():
                         text_results[latest_person] = MyText
                     print(f"Speech associated with person: {latest_person}")
 
-                SpeakText(MyText)
+                speak_text(MyText)
 
         except sr.RequestError as e:
             print("Could not request results; {0}".format(e))
