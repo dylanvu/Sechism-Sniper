@@ -3,9 +3,9 @@ from deepface import DeepFace
 import os
 import random
 import speech_recognition as sr
-import numpy as np
 import pyttsx3
 import threading
+import gemini
 import queue
 
 # Path to the face database
@@ -17,6 +17,7 @@ lock = threading.Lock()
 count = len(os.listdir(facesPath))
 people = {} # filename -> {redFlagCount, x-coord, y-coord, width, height}
 text_results = {}
+textQueue = queue.Queue()
 
 # test function (delete later)
 def detect_faces(frame):
@@ -54,7 +55,7 @@ def recognize_faces(frame):
                 print("Face Exists")
                 identity = result[0]['identity'][0]
                 with lock:
-                    people[identity] = {"redFlag" : random.randint(0, 10), "x" : x, "y" : y, "w" : w, "h" : h}
+                    people[identity] = {"redFlag" : random.randint(0,10), "x" : x, "y" : y, "w" : w, "h" : h}
 
                 # sets text and box frame around person
                 # cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 4)
@@ -66,7 +67,7 @@ def recognize_faces(frame):
                 print("Adding New Face")
                 identity = save_new_face(face)
                 with lock:
-                    people[identity] = people[identity] = {"redFlag" : random.randint(0, 10), "x" : x, "y" : y, "w" : w, "h" : h}
+                    people[identity] = people[identity] = {"redFlag" : 0, "x" : x, "y" : y, "w" : w, "h" : h}
 
                 # sets text and box frame around person
                 # cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 4)
@@ -84,9 +85,10 @@ def recognize_faces(frame):
             redFlag = people[redFlag]
             print(f"Red Flag: {redFlag}")
 
-            # sets text and box frame around person
-            cv2.rectangle(frame, (redFlag['x'], redFlag['y']), (redFlag['x'] + redFlag['w'], redFlag['y'] + redFlag['h']), (0, 0, 255), 4)
-            cv2.putText(frame, "Red Flag", (redFlag['x'], redFlag['y'] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+            if redFlag['redFlag'] != 0:
+                # sets text and box frame around person
+                cv2.rectangle(frame, (redFlag['x'], redFlag['y']), (redFlag['x'] + redFlag['w'], redFlag['y'] + redFlag['h']), (0, 0, 255), 4)
+                cv2.putText(frame, "Red Flag", (redFlag['x'], redFlag['y'] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
 
     # people.clear()
     return faces
@@ -99,7 +101,7 @@ def save_new_face(face):
     cv2.imwrite(newFacePath, face)
     return newFacePath
 
-# run webcame
+# run webcam
 def web_cam():
     print("Starting Facial Recognition")
 
@@ -135,32 +137,44 @@ def speak_text(command):
     engine.runAndWait()
 
 def speech_to_text():
+    print("Listening")
     while True:    
         try:
             # Use the microphone as source for input
             with sr.Microphone() as source2:
                 # Adjust the energy threshold based on the surrounding noise level
                 r.adjust_for_ambient_noise(source2, duration=0.2)
+
+                print("Say Something:")
                 
                 # Listen for the user's input 
                 audio2 = r.listen(source2)
                 
+                print("Detected Speech")
+
                 # Using Google to recognize audio
                 MyText = r.recognize_google(audio2)
                 MyText = MyText.lower()
 
-                print(f"Text Detected: {MyText}")
+                print(f"Converted Text: {MyText}")
+
+                if redFlagDetection.analyze_text(MyText):
+                    print("Red Flag")
+                else:
+                    print("Not Important")
 
                 # if speech recognized, associate it with the latest recognized face
-                if people:
-                    center_x, center_y = video_capture.get(cv2.CAP_PROP_FRAME_WIDTH) / 2, video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT) / 2
-                    latest_person = max(people, key=lambda p: ((p['x'] + p['w'] / 2) - center_x) ** 2 + ((p['y'] + p['h'] / 2) - center_y) ** 2)
-                    with lock:
-                        text_results[latest_person] = MyText
-                    print(f"Speech associated with person: {latest_person}")
+                # if people:
+                #     center_x, center_y = video_capture.get(cv2.CAP_PROP_FRAME_WIDTH) / 2, video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT) / 2
+                #     latest_person = max(people, key=lambda p: ((p['x'] + p['w'] / 2) - center_x) ** 2 + ((p['y'] + p['h'] / 2) - center_y) ** 2)
+                #     with lock:
+                #         text_results[latest_person] = MyText
+                #     print(f"Speech associated with person: {latest_person}")
 
-                speak_text(MyText)
+                # speak_text(MyText)
 
+        except sr.WaitTimeoutError:
+            print("Listening timed out, please speak again.")
         except sr.RequestError as e:
             print("Could not request results; {0}".format(e))
         except sr.UnknownValueError:
@@ -171,17 +185,20 @@ if __name__ == "__main__":
     face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
     video_capture = cv2.VideoCapture(0)
 
+    # Initialize gemini to detect red flags
+    redFlagDetection = gemini.GeminiAPI()
+
     # Initialize the recognizer 
     r = sr.Recognizer() 
 
     # Create threads for facial recognition and speech recognition
-    # face_thread = threading.Thread(target=web_cam)
+    face_thread = threading.Thread(target=web_cam)   # this won't work but this will # web_cam()
     speech_thread = threading.Thread(target=speech_to_text)
 
     # Start the threads
-    # face_thread.start()
+    face_thread.start()
     speech_thread.start()
 
     # Wait for both threads to finish
-    # face_thread.join()
+    face_thread.join()
     speech_thread.join()
