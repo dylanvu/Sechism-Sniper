@@ -108,3 +108,10 @@ json
 pip install opencv-python
 
 pip install deepface
+
+pip install speechrecognition
+
+pip install pyaudio
+    - if missing dependencies do "brew install portaudio" and try command again
+
+pip install pyttsx3

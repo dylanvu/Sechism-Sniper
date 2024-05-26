@@ -1,0 +1,4 @@
+google-generativeai==0.5.4
+grpcio-status==1.62.2
+pip-chill==1.0.3
+python-dotenv==1.0.1
