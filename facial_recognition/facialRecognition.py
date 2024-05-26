@@ -11,6 +11,8 @@ import gemini
 import queue
 from serial_interface import sendCommand
 import serial
+from PIL import Image
+from io import BytesIO
 
 BACKEND_URL = 'http://localhost:3000'
 
@@ -21,7 +23,7 @@ os.makedirs(facesPath, exist_ok=True)
 # list of people
 lock = threading.Lock()
 count = len(os.listdir(facesPath))
-people = {} # key : id, value: {score, x, y, w, h}
+people = {} # key : id, value: {name, score, x, y, w, h}
 # text_results = {}
 textQueue = queue.Queue()
 personQueue = queue.Queue()
@@ -34,13 +36,20 @@ stop_event = threading.Event()
 
 # set up serial interface
 port = "COM9" # windows, TODO: FIXME
-ser = serial.Serial(port=port, baudrate=115200, timeout=0.1)
+
+try:
+    ser = serial.Serial(port=port, baudrate=115200, timeout=0.1)
+except:
+    ser = None
+    
 time.sleep(2)
 
 # identifies faces in webcam view
 def recognize_faces(frame):
     # TODO: Jayson needs to add a face that will be associated with the most recent audio
     # TODO: add it to the personQueue
+    
+    global people
 
     gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     faces = face_classifier.detectMultiScale(gray_image, 1.3, 7, minSize=(40, 40))
@@ -65,7 +74,9 @@ def recognize_faces(frame):
             # Check if the face database directory is empty
             if not os.listdir(facesPath):
                 print("Face database is empty. Adding person automatically.")
-                save_new_face(face)
+                identity = save_new_face(face)
+                print(identity)
+                people[identity[0]] = {"name": identity[1], "score" : 0, "x" : x, "y" : y, "w" : w, "h" : h}
             
             # Recognize the face using DeepFace
             result = DeepFace.find(face, db_path=facesPath, enforce_detection=False)
@@ -74,17 +85,16 @@ def recognize_faces(frame):
             if len(result[0]['identity']) != 0: # and result[0].iloc[0]['distance'] < 0.5
                 # pulls id from known person (pandas.dataframe --> pandas.Series --> string)
                 print("Face Exists")
-                identity = result[0]['identity'][0]
+                identity = result[0]['identity'][0] # in path reference format
+                print(identity)
+                print(people)
                 # updates latest position of face
                 with lock:
-                    # for testing purpose , delete later
-                    people[identity] = {"score" : 1, "x" : x, "y" : y, "w" : w, "h" : h}
-
                     # for actual use
-                    # people[identity]["x"] = x
-                    # people[identity]["y"] = y
-                    # people[identity]["w"] = w
-                    # people[identity]["h"] = h
+                    people[identity]["x"] = x
+                    people[identity]["y"] = y
+                    people[identity]["w"] = w
+                    people[identity]["h"] = h
                 
                 # see if face is public enemy
                 if identity == publicEnemy:
@@ -97,10 +107,25 @@ def recognize_faces(frame):
                 print("Adding New Face")
                 # saving new face into database
                 identity = save_new_face(face)
+                
                 # saving face coordinates in local dictionary
                 with lock:
-                    people[identity] = {"score" : 0, "x" : x, "y" : y, "w" : w, "h" : h}
-            
+                    people[identity[0]] = {"name" : identity[1], "score" : 0, "x" : x, "y" : y, "w" : w, "h" : h}
+                
+                # adding a new user to the database
+                payload = {
+                    "user_id" : identity[1],
+                    "image_file" : identity[2],
+                    "score" : 0
+                }
+                
+                # post request to add user to the database
+                try:
+                    response = requests.post(BACKEND_URL + '/sendData', data=payload)
+                    response.raise_for_status()
+                except requests.exceptions.RequestException as e:
+                    print(f"An error occurred: {e}")
+                    
             # checks for face closest (assume they're the most recently connected to any audio)
             if closestDistance == None or find_closest_face(x,y, centerX, centerY) < closestDistance:
                 closestFace = identity
@@ -116,13 +141,23 @@ def recognize_faces(frame):
 
     return faces
 
+# function to generate unique id
+def generate_unique_id():
+    # Get the current time in seconds since the epoch
+    timestamp = time.time()
+    # Convert to a string and remove the decimal point
+    unique_id = str(timestamp).replace('.', '')
+    return unique_id
+
+
 # add new face to database
 def save_new_face(face):
     global count
-    newFacePath = os.path.join(facesPath, f"person_{count}.jpg")
+    name = generate_unique_id()
+    newFacePath = os.path.join(facesPath, f"{name}.jpg")
     count += 1
     cv2.imwrite(newFacePath, face)
-    return newFacePath
+    return [newFacePath, name, name + ".jpg"]
 
 # calculate (x,y) distance from center of webcam
 def find_closest_face(x, y, centerX, centerY):
@@ -267,6 +302,7 @@ if __name__ == "__main__":
                     print("No person to associate text with.")
                 else:
                     person = personQueue.get()
+                    print("Analyzing:", text)
 
                     # TODO: Send text to Gemini API for red flag detection
                     # TODO: person said something bad increment a red flag, save to database, etc jayson will handle this
@@ -277,9 +313,24 @@ if __name__ == "__main__":
                             print(f"Text associated with person: {person}")
                             # increase red flag score
                             people[person]["score"] += 1
-
+                            
+                            # increase the persons score in the database
+                            payload = {
+                                "user_id" : person,
+                                "score_to_add": "1"
+                            }
+                            
+                            # update the score on the database
+                            # try:
+                            response = requests.put(BACKEND_URL + '/updateData', json=payload)
+                            response.status_code
+                            # except:
+                                
+                                
+                            
                     # fire the gun to deliver the justice javelin
-                    sendCommand("0", ser)
+                    if ser is not None:
+                        sendCommand("0", ser)
 
             # Keep the main thread alive
             time.sleep(0.1) 
