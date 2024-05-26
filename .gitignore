@@ -1,0 +1,10 @@
+# test images
+/facial_recognition/faces
+
+# secret 
+service_account.json
+
+# .env vairables
+.env
+
+node_modules
