@@ -3,10 +3,6 @@
 
 HackAtUCI + WiCS = Venus Hacks 2024
 
-<<<<<<< HEAD
-  
-
-
 ## Send Data to Database
 **/sendData**
 
@@ -17,15 +13,18 @@ HackAtUCI + WiCS = Venus Hacks 2024
 - score: number
 
 *Response:*
-`{
-"user_id": "ab123", 
-"score": 1, 
+```json
+{
+"user_id": "ab123",
+"score": 1,
 "fileName": "baldgate.png",
 "fileUrl": "https://storage.googleapis.com/venushacks2024-777a4.appspot.com/baldgate.png"
-}`
+}
+```
 
 ## Get Data from Database
 **/getData**
+
 *Request:*
 - Header: application/json
 - `data {
