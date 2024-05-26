@@ -2,7 +2,7 @@
 
 // this code is for ESP32C3 Dev Module
 // #include <ESP32Servo.h>
-#include <Arduino_JSON.h>
+// #include <Arduino_JSON.h>
 
 // const int HORIZONTAL_SERVO = 40;
 // const int VERTICAL_SERVO = 39;    // for now
@@ -11,11 +11,32 @@
 const int FLYWHEEL_GPIO = 4;
 const int TRIGGER_GPIO = 5;
 
+int incomingByte = 52; // for incoming serial data
+
 // Servo horizontalServo; 
 // Servo verticalServo;
 
 // declare functions
 // void followCoordinates(const int x, const int y, const int camHeight, const int camWidth, const int horizontalFOV, const int verticalFOV);
+
+void fire() {
+  Serial.println("Ramping up FlyWheel");
+  // allow flywheel to ramp up for 3 seconds
+  digitalWrite(FLYWHEEL_GPIO, HIGH);
+  delay(2000);
+
+  // pulse the trigger
+  Serial.println("Fire!");
+  digitalWrite(TRIGGER_GPIO, HIGH); // retract
+  delay(500);
+  digitalWrite(TRIGGER_GPIO, LOW); // extend
+
+  Serial.println("Shutting off Flywheel!");
+  // allow flywheel to ramp down for 3 seconds
+  digitalWrite(FLYWHEEL_GPIO, LOW);
+  delay(2000);
+  Serial.println("Done!");
+}
 
 void setup() {
   Serial.begin(115200);
@@ -27,6 +48,7 @@ void setup() {
   pinMode(TRIGGER_GPIO, OUTPUT);
   Serial.println("Ready to loop");
 }
+
 
 void loop() {
   // Use a buffer for incoming data (adjust size if needed)
@@ -67,23 +89,30 @@ void loop() {
   //   }
   // }
 
-  // firing test
-  Serial.println("Ramping up FlyWheel");
-  // allow flywheel to ramp up for 3 seconds
-  digitalWrite(FLYWHEEL_GPIO, HIGH);
-  delay(2000);
+  if (Serial.available() > 0) {
+    // read the incoming byte:
+    incomingByte = Serial.read();
 
-  // pulse the trigger
-  Serial.println("Fire!");
-  digitalWrite(TRIGGER_GPIO, HIGH); // retract
-  delay(500);
-  digitalWrite(TRIGGER_GPIO, LOW); // extend
+    // filter out the newline
+    if (incomingByte == 10)
+    {
+        return;
+    }
 
-  Serial.println("Shutting off Flywheel!");
-  // allow flywheel to ramp down for 3 seconds
-  digitalWrite(FLYWHEEL_GPIO, LOW);
-  delay(2000);
-  Serial.println("Done!");
+    Serial.print("I received: ");
+    Serial.println(incomingByte);
+
+    // check if the incoming byte is character 0
+    // fire if so
+    if (incomingByte == 48) {
+      Serial.println("Firing sequence initiated!");
+      // fire
+      fire();
+    }
+  }
+
+  // loop through firing for testing
+  fire();
 }
 
 // void followCoordinates(const int x, const int y, const int camHeight, const int camWidth, const int horizontalFOV, const int verticalFOV) {

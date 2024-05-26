@@ -4,10 +4,11 @@ from deepface import DeepFace
 import os
 import random
 import speech_recognition as sr
-import pyttsx3
 import threading
 import gemini
 import queue
+from serial_interface import sendCommand
+import serial
 # do not forget pyaudio installation
 
 # Path to the face database
@@ -24,6 +25,11 @@ personQueue = queue.Queue()
 
 # global event to signal thread termination
 stop_event = threading.Event()
+
+# set up serial interface
+port = "COM9" # windows, TODO: FIXME
+ser = serial.Serial(port=port, baudrate=115200, timeout=0.1)
+time.sleep(2)
 
 # identifies faces in webcam view
 def recognize_faces(frame):
@@ -205,8 +211,8 @@ if __name__ == "__main__":
 
                     # TODO: person said something bad increment a red flag, save to database, etc jayson will handle this
 
-                    # trigger the gun
-                    # TODO: dylan will handle this
+                    # fire the gun to deliver the justice javelin
+                    sendCommand("0", ser)
 
 
             time.sleep(0.1)  # Keep the main thread alive
