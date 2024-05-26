@@ -6,7 +6,12 @@ import speech_recognition as sr
 import numpy as np
 import pyttsx3
 import threading
+import requests
 import queue
+import time
+import requests
+
+BACKEND_URL = 'http://localhost:3000'
 
 # Path to the face database
 facesPath = "facial_recognition/faces"
