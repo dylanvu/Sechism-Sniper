@@ -71,18 +71,18 @@ void loop() {
   Serial.println("Ramping up FlyWheel");
   // allow flywheel to ramp up for 3 seconds
   digitalWrite(FLYWHEEL_GPIO, HIGH);
-  delay(3000);
+  delay(2000);
 
   // pulse the trigger
   Serial.println("Fire!");
   digitalWrite(TRIGGER_GPIO, HIGH); // retract
-  delay(1000);
+  delay(500);
   digitalWrite(TRIGGER_GPIO, LOW); // extend
 
   Serial.println("Shutting off Flywheel!");
   // allow flywheel to ramp down for 3 seconds
   digitalWrite(FLYWHEEL_GPIO, LOW);
-  delay(3000);
+  delay(2000);
   Serial.println("Done!");
 }
 
