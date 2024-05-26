@@ -2,21 +2,17 @@ import time
 import cv2
 from deepface import DeepFace
 import os
-import random
-import speech_recognition as sr
-import pyttsx3
+import speech_recognition as sr # do not forget pyaudio installation
 import threading
-import requests
 import queue
 import time
 import requests
-from PIL import Image
-from io import BytesIO
-
-BACKEND_URL = 'http://localhost:3000'
 import gemini
 import queue
-# do not forget pyaudio installation
+from serial_interface import sendCommand
+import serial
+
+BACKEND_URL = 'http://localhost:3000'
 
 # Path to the face database
 facesPath = "faces"
@@ -25,13 +21,21 @@ os.makedirs(facesPath, exist_ok=True)
 # list of people
 lock = threading.Lock()
 count = len(os.listdir(facesPath))
-people = {} # filename -> {redFlagCount, x-coord, y-coord, width, height}
-text_results = {}
+people = {} # key : id, value: {score, x, y, w, h}
+# text_results = {}
 textQueue = queue.Queue()
 personQueue = queue.Queue()
 
+mostRecentFace = None # stores image path reference
+publicEnemy = None # stores image path reference
+
 # global event to signal thread termination
 stop_event = threading.Event()
+
+# set up serial interface
+port = "COM9" # windows, TODO: FIXME
+ser = serial.Serial(port=port, baudrate=115200, timeout=0.1)
+time.sleep(2)
 
 # identifies faces in webcam view
 def recognize_faces(frame):
@@ -40,6 +44,17 @@ def recognize_faces(frame):
 
     gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     faces = face_classifier.detectMultiScale(gray_image, 1.3, 7, minSize=(40, 40))
+
+    # center of webcam
+    centerX, centerY = video_capture.get(cv2.CAP_PROP_FRAME_WIDTH) / 2, video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT) / 2
+
+    # TODO: Jayson needs to add a face that will be associated with the most recent audio, add it to the personQueue
+    # variables to help keep track of closest seen face
+    closestFace = None
+    closestDistance = None
+
+    # locate public enemy
+    find_public_enemy()
 
     # run this code if directory is not empty
     for (x, y, w, h) in faces:
@@ -62,7 +77,20 @@ def recognize_faces(frame):
                 identity = result[0]['identity'][0]
                 # updates latest position of face
                 with lock:
-                    people[identity] = {"redFlag" : random.randint(0,10), "x" : x, "y" : y, "w" : w, "h" : h}
+                    # for testing purpose , delete later
+                    people[identity] = {"score" : 1, "x" : x, "y" : y, "w" : w, "h" : h}
+
+                    # for actual use
+                    # people[identity]["x"] = x
+                    # people[identity]["y"] = y
+                    # people[identity]["w"] = w
+                    # people[identity]["h"] = h
+                
+                # see if face is public enemy
+                if identity == publicEnemy:
+                    print("Public Enemy in View!!!")
+                else: 
+                    print(f"No go: {identity} vs {publicEnemy}")
 
             # if we don't find existing person
             else:
@@ -71,26 +99,21 @@ def recognize_faces(frame):
                 identity = save_new_face(face)
                 # saving face coordinates in local dictionary
                 with lock:
-                    people[identity] = people[identity] = {"redFlag" : 0, "x" : x, "y" : y, "w" : w, "h" : h}
-
+                    people[identity] = {"score" : 0, "x" : x, "y" : y, "w" : w, "h" : h}
+            
+            # checks for face closest (assume they're the most recently connected to any audio)
+            if closestDistance == None or find_closest_face(x,y, centerX, centerY) < closestDistance:
+                closestFace = identity
+                closestDistance = find_closest_face(x,y, centerX, centerY)
+        
         except Exception as e:
             print(f"Error recognizing face: {e}")
             cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 4)
             cv2.putText(frame, "Error", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
 
-        if people:
-            # find user with highest red flag count
-            print(f"All people: {people}")
-            redFlag = max(people, key=lambda p: people[p]['redFlag'])
-            redFlag = people[redFlag]
-            print(f"Red Flag: {redFlag}")
+    personQueue.put(closestFace)
+    print(f"Closest Face: {closestFace}")
 
-            if redFlag['redFlag'] != 0:
-                # sets text and box frame around person
-                cv2.rectangle(frame, (redFlag['x'], redFlag['y']), (redFlag['x'] + redFlag['w'], redFlag['y'] + redFlag['h']), (0, 0, 255), 4)
-                cv2.putText(frame, "Red Flag", (redFlag['x'], redFlag['y'] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
-
-    # people.clear()
     return faces
 
 # add new face to database
@@ -100,6 +123,29 @@ def save_new_face(face):
     count += 1
     cv2.imwrite(newFacePath, face)
     return newFacePath
+
+# calculate (x,y) distance from center of webcam
+def find_closest_face(x, y, centerX, centerY):
+    return (centerX - x)**2 + (centerY - y)**2
+
+# find person with the highest red flag
+def find_public_enemy():
+    global publicEnemy
+    # find person with highest red flag
+    if people:
+        # find user with highest red flag count
+        person = max(people, key=lambda p: people[p]['score'])
+        redFlag = people[person]
+
+        # only have public enemy if red flags detected
+        if redFlag['score'] != 0:
+            # keeps track of person with highest red flag
+            publicEnemy = person
+            print(f"Red Flag: {publicEnemy}")
+
+            # sets text and box frame around person
+            # cv2.rectangle(frame, (redFlag['x'], redFlag['y']), (redFlag['x'] + redFlag['w'], redFlag['y'] + redFlag['h']), (0, 0, 255), 4)
+            # cv2.putText(frame, "Red Flag", (redFlag['x'], redFlag['y'] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
 
 # run webcam
 def web_cam():
@@ -112,13 +158,14 @@ def web_cam():
 
         # terminate the loop if the frame is not read successfully
         if result is False:
+            print("Error reading frame from webcam. Exiting...")
             break 
 
         # apply the function we created to the video frame
         faces = recognize_faces(videoFrame) 
 
-        # display the processed frame in a window named "My Face Detection Project"
-        cv2.imshow("Amelio", videoFrame)  
+        # display the processed frame in a window
+        cv2.imshow("Discrimination Decimator", videoFrame)  
 
         # quit process by pressing key "q"
         if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -128,6 +175,7 @@ def web_cam():
     video_capture.release()
     cv2.destroyAllWindows()
 
+# convert speech to text
 def speech_to_text():
     print("Listening")
     while not stop_event.is_set():    
@@ -152,19 +200,6 @@ def speech_to_text():
 
                 # add to the queue
                 textQueue.put(MyText)
-
-                # if redFlagDetection.analyze_text(MyText):
-                #     print("Red Flag")
-                # else:
-                #     print("Not Important")
-
-                # # if speech recognized, associate it with the latest recognized face
-                # if people:
-                #     center_x, center_y = video_capture.get(cv2.CAP_PROP_FRAME_WIDTH) / 2, video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT) / 2
-                #     latest_person = max(people, key=lambda p: ((p['x'] + p['w'] / 2) - center_x) ** 2 + ((p['y'] + p['h'] / 2) - center_y) ** 2)
-                #     with lock:
-                #         text_results[latest_person] = MyText
-                #     print(f"Speech associated with person: {latest_person}")
 
         except sr.WaitTimeoutError:
             print("Listening timed out, please speak again.")
@@ -203,14 +238,17 @@ if __name__ == "__main__":
     face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
     video_capture = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
+    # local testing without threading
+    # web_cam()
+
     # Initialize gemini to detect red flags
-    redFlagDetection = gemini.GeminiAPI()
+    gem = gemini.GeminiAPI()
 
     # Initialize the recognizer 
     r = sr.Recognizer() 
 
     # Create threads for facial recognition and speech recognition
-    face_thread = threading.Thread(target=web_cam) # if running without web_cam()
+    face_thread = threading.Thread(target=web_cam) # if running without thread use web_cam()
     speech_thread = threading.Thread(target=speech_to_text)
 
     # Start the threads
@@ -229,20 +267,22 @@ if __name__ == "__main__":
                     print("No person to associate text with.")
                 else:
                     person = personQueue.get()
-                    with lock:
-                        text_results[person] = text
-                    print(f"Text associated with person: {person}")
 
                     # TODO: Send text to Gemini API for red flag detection
-                    isBad = True # Placeholder for now
-
                     # TODO: person said something bad increment a red flag, save to database, etc jayson will handle this
+                    if gem.analyze_text(text):
+                        print("Red Flag")
+                        with lock:
+                            # text_results[person] = text
+                            print(f"Text associated with person: {person}")
+                            # increase red flag score
+                            people[person]["score"] += 1
 
-                    # trigger the gun
-                    # TODO: dylan will handle this
+                    # fire the gun to deliver the justice javelin
+                    sendCommand("0", ser)
 
-
-            time.sleep(0.1)  # Keep the main thread alive
+            # Keep the main thread alive
+            time.sleep(0.1) 
 
     except KeyboardInterrupt:
         print("Exiting...")
