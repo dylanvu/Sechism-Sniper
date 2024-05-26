@@ -8,6 +8,7 @@ import { getStorage } from 'firebase-admin/storage';
 
 import serviceAccount from "../service_account.json";
 import { error } from "console";
+import { get } from "http";
 
 dotenv.config();
 
@@ -158,6 +159,27 @@ app.put("/updateData",  async (req: Request, res: Response) => {
 
 })
 
+// route to get all users in the database
+// Request format:
+// http://localhost:3000/getAllData 
+app.get("/getAllData", async (req: Request, res: Response) => {
+  try {
+    const data = await getAllDataFromFireStore()
+    console.log(data)
+    if (data) {
+      console.log("all data sent")
+      res.send(data)
+    }
+    else {
+      res.send({error: -2, note: "unable to get data from database but it's not empty"})
+    }
+  }
+  catch (error) {
+    res.send({error: -1, note: "database is empty"})
+  }
+
+})
+
 
 // function to add text data to database
 async function addtoFirestore(user_id: string,  score: number, public_url: string) {
@@ -185,7 +207,7 @@ async function getDataFromFireStore(user_id: string) {
     }
     else {
       snapshot.forEach(doc => {
-        list.push({[doc.id] : doc.data()})
+        list.push({...doc.data()})
       })
       return list
     }
@@ -235,4 +257,28 @@ const updateScoreInFireStore = async (userID: string, scoreToAdd: number) => {
     }
   }
 };
+
+// function to retrieve all of the data in the database
+async function getAllDataFromFireStore() {
+  try {
+    // get collection of all users
+    const usersRef = db.collection('users')
+    const snapshot = await usersRef.get()
+
+    if (snapshot.empty) {
+      return -1
+    }
+
+    const docs: {}[] = []
+    snapshot.forEach(doc => {
+      docs.push({...doc.data()})
+    })
+    return docs
+  }
+  catch(error) {
+    console.log(error)
+    return -1
+  }
+}
+
 

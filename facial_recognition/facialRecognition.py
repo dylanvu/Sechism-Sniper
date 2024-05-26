@@ -5,6 +5,12 @@ import os
 import random
 import speech_recognition as sr
 import threading
+import requests
+import queue
+import time
+import requests
+
+BACKEND_URL = 'http://localhost:3000'
 import gemini
 import queue
 from serial_interface import sendCommand
