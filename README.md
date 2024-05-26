@@ -3,6 +3,7 @@
 
 HackAtUCI + WiCS = Venus Hacks 2024
 
+<<<<<<< HEAD
   
 
 
