@@ -29,8 +29,10 @@ void fire() {
   Serial.println("Fire!");
   digitalWrite(TRIGGER_GPIO, HIGH); // retract
   delay(500);
+  // delay(2000); // FIXME
   digitalWrite(TRIGGER_GPIO, LOW); // extend
-
+  // delay for the bullet travel to flywheel
+  delay(2000);
   Serial.println("Shutting off Flywheel!");
   // allow flywheel to ramp down for 3 seconds
   digitalWrite(FLYWHEEL_GPIO, LOW);
@@ -113,6 +115,7 @@ void loop() {
 
   // loop through firing for testing
   fire();
+  delay(5000);
 }
 
 // void followCoordinates(const int x, const int y, const int camHeight, const int camWidth, const int horizontalFOV, const int verticalFOV) {
