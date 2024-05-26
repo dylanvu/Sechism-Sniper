@@ -6,3 +6,4 @@ pysocks==1.7.1
 python-dotenv==1.0.1
 pyttsx3==2.90
 speechrecognition==3.10.4
+tf-keras==2.16.0

@@ -1,3 +1,4 @@
+import time
 import cv2
 from deepface import DeepFace
 import os
@@ -7,6 +8,7 @@ import pyttsx3
 import threading
 import gemini
 import queue
+# do not forget pyaudio installation
 
 # Path to the face database
 facesPath = "facial_recognition/faces"
@@ -18,6 +20,9 @@ count = len(os.listdir(facesPath))
 people = {} # filename -> {redFlagCount, x-coord, y-coord, width, height}
 text_results = {}
 textQueue = queue.Queue()
+
+# global event to signal thread termination
+stop_event = threading.Event()
 
 # test function (delete later)
 def detect_faces(frame):
@@ -138,7 +143,7 @@ def speak_text(command):
 
 def speech_to_text():
     print("Listening")
-    while True:    
+    while not stop_event.is_set():    
         try:
             # Use the microphone as source for input
             with sr.Microphone() as source2:
@@ -199,6 +204,19 @@ if __name__ == "__main__":
     face_thread.start()
     speech_thread.start()
 
-    # Wait for both threads to finish
-    face_thread.join()
-    speech_thread.join()
+    try:
+        while True:
+            time.sleep(0.1)  # Keep the main thread alive
+
+    except KeyboardInterrupt:
+        print("Exiting...")
+
+    finally:
+        # Signal threads to stop
+        stop_event.set()
+
+        # Give threads time to exit (adjust timeout if needed)
+        face_thread.join(timeout=2.0)
+        speech_thread.join(timeout=2.0)
+
+        print("Threads stopped.")
